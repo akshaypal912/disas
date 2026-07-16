@@ -25,7 +25,6 @@
     </header>
 
     <main class="max-w-7xl mx-auto p-4 lg:p-8 space-y-8">
-
         <div class="bg-red-950/20 border border-red-900/30 p-4 rounded-xl flex items-center gap-3">
             <i class="fa-solid fa-triangle-exclamation text-red-500 text-lg animate-bounce"></i>
             <p id="alert-banner" class="text-xs text-red-400 font-mono">CRITICAL TELEMETRY STABILIZED: ALL 11 MAJOR PIPELINE ISSUES INTEGRATED AND VERIFIED.</p>
@@ -51,9 +50,7 @@
         </section>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
             <div class="space-y-8 lg:col-span-1">
-                
                 <div class="bg-red-950/20 border border-red-900/40 p-6 rounded-2xl space-y-4">
                     <h3 id="sos-title" class="text-xs font-mono font-bold text-red-500 flex items-center gap-2">
                         <i class="fa-solid fa-circle-radiation animate-pulse"></i> DIRECT TACTICAL SOS GATEWAY
@@ -82,11 +79,9 @@
                         Transmit / Thumela
                     </button>
                 </div>
-
             </div>
 
             <div class="space-y-8 lg:col-span-2">
-
                 <div class="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-6 space-y-4">
                     <div class="flex justify-between items-center">
                         <h3 id="map-title" class="text-xs font-mono font-bold text-slate-300 flex items-center gap-2">
@@ -134,31 +129,6 @@
                         <button class="px-4 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-mono uppercase font-bold">Query</button>
                     </form>
                 </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="p-6 bg-slate-900/50 border border-slate-800/80 rounded-2xl space-y-3">
-                        <h3 id="resource-title" class="text-xs font-mono font-bold text-slate-300">📦 ALLOCATED EMERGENCY SUPPLIES</h3>
-                        <div class="space-y-2 text-xs font-mono">
-                            <div class="p-2.5 bg-slate-950 rounded border border-slate-805 flex justify-between">
-                                <span class="text-slate-400">Water Storage Units</span>
-                                <span class="text-emerald-400 font-bold">120 Units</span>
-                            </div>
-                            <div class="p-2.5 bg-slate-950 rounded border border-slate-805 flex justify-between">
-                                <span class="text-slate-400">First-Aid Field Packs</span>
-                                <span class="text-emerald-400 font-bold">45 Units</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="p-6 bg-slate-900/50 border border-slate-800/80 rounded-2xl space-y-3">
-                        <h3 id="alerts-title" class="text-xs font-mono font-bold text-slate-300">🚨 WEBSOCKET EVENTS (REAL-TIME)</h3>
-                        <div id="ws-alerts" class="space-y-2 h-24 overflow-y-auto text-[10px] font-mono text-slate-400">
-                            <div class="p-1.5 bg-slate-950 rounded border border-slate-850">● [14:40:02] Socket pipeline synchronized.</div>
-                            <div class="p-1.5 bg-slate-950 rounded border border-slate-850">● [14:42:15] Telemetry ping from Hub Durban.</div>
-                        </div>
-                    </div>
-                </div>
-
             </div>
         </div>
     </main>
@@ -230,8 +200,6 @@
             document.getElementById('map-title').innerHTML = `<i class="fa-solid fa-satellite-dish text-red-500"></i> \${trans[currentLang].mapTitle}`;
             document.getElementById('nearby-title').innerText = trans[currentLang].nearbyTitle;
             document.getElementById('ai-title').innerHTML = `<i class="fa-solid fa-robot text-red-500"></i> \${trans[currentLang].aiTitle}`;
-            document.getElementById('resource-title').innerText = trans[currentLang].resourceTitle;
-            document.getElementById('alerts-title').innerText = trans[currentLang].alertsTitle;
         }
 
         function triggerSOS() {
@@ -283,18 +251,6 @@
             input.value = "";
             chatbox.scrollTop = chatbox.scrollHeight;
         }
-
-        setInterval(() => {
-            const alerts = [
-                "New logistics update: Water delivery dispatched.",
-                "WebSocket telemetry handshake validated.",
-                "Safe Zone 4 reporting standard power matrix."
-            ];
-            const randAlert = alerts[Math.floor(Math.random() * alerts.length)];
-            const time = new Date().toLocaleTimeString();
-            const box = document.getElementById('ws-alerts');
-            box.innerHTML = `<div class="p-1.5 bg-slate-950 rounded border border-slate-850">● [\${time}] \${randAlert}</div>` + box.innerHTML;
-        }, 8000);
     </script>
 </body>
 </html>
