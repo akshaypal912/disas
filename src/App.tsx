@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { askGemini } from "./lib/gemini";
 import { 
   FolderTree, 
   Map, 
@@ -943,26 +944,29 @@ export default function App() {
     ]);
   };
 
-  const triggerGraniteTriage = () => {
+  const triggerGraniteTriage = async () => {
     setIsTriageLoading(true);
     setTriagePlan(null);
-    setDashLogs(prev => [`[${new Date().toLocaleTimeString()}] 🧠 GRANITE AI TRIAGE: Synthesizing relief route polygons using watsonx Granite LLM...`, ...prev]);
+    setDashLogs(prev => [`[${new Date().toLocaleTimeString()}] 🧠 GEMINI AI TRIAGE: Synthesizing relief route polygons using Gemini AI...`, ...prev]);
 
-    setTimeout(() => {
-      setIsTriageLoading(false);
-      const plans: Record<string, string> = {
-        floods: "CRISIS DISPATCH PLAN: Establish sandbag buffer vectors at coordinates. Establish dynamic escape vectors along secondary roadways. Target Shelter Alpha.",
-        earthquakes: "CRISIS DISPATCH PLAN: High structure collapse potential. K9 scouts dispatch coordinates: Sector fault intersection. Mobilize heavy rescue excavators.",
-        cyclones: "CRISIS DISPATCH PLAN: Power grid disabled dynamically. High speed surge barriers activated. Sheltered occupants to be tracked on sector telemetry grid.",
-        fires: "CRISIS DISPATCH PLAN: Wind vectors pushing flames at 12 knots Eastward. Create 40-meter wide firebreak polygon. Route responder fire engines along Windward pass.",
-        landslides: "CRISIS DISPATCH PLAN: Soil saturation threshold crossed. Trigger automated road blockades on Sector 4 Highway. Dispatch mud removal bulldozers.",
-        heatwaves: "CRISIS DISPATCH PLAN: Urban wet-bulb temperature is critical. Direct elderlies to cooling stations. Expand power limits for secondary backup AC generators."
-      };
-      const activePlan = plans[dashDisasterId] || plans.floods;
+    try {
+      const prompt = `You are a disaster response coordinator AI. Generate a concise tactical crisis dispatch plan.
+
+Disaster Type: ${dashDisasterId}
+Location: ${dashLocationName} (Lat: ${dashLat}, Lng: ${dashLng})
+Severity: ${dashSeverity}
+Active Responders: ${dashResponders} teams
+Evacuated: ${dashEvacuated} residents
+Power Grid: ${dashGridStatus}
+
+Provide a structured CRISIS DISPATCH PLAN with 3-5 specific actionable steps. Be direct and tactical.`;
+
+      const activePlan = await askGemini(prompt);
       setTriagePlan(activePlan);
 
       // Save to localStorage Tactical History
       const newReport: HistoryReport = {
+
         id: "report_" + Date.now(),
         disasterId: dashDisasterId,
         disasterName: dashDisasterId.charAt(0).toUpperCase() + dashDisasterId.slice(1),
@@ -985,10 +989,16 @@ export default function App() {
       }
 
       setDashLogs(prev => [
-        `[${new Date().toLocaleTimeString()}] 🧠 GRANITE AI DECISION: Optimized coordination routes mapped with confidence score 94.6%. Saved to Tactical History archive.`,
+        `[${new Date().toLocaleTimeString()}] 🧠 GEMINI AI DECISION: Optimized coordination routes mapped. Saved to Tactical History archive.`,
         ...prev
       ]);
-    }, 1500);
+    } catch (err) {
+      console.error("Gemini triage error:", err);
+      setTriagePlan("AI service unavailable. Please check your GEMINI_API_KEY and try again.");
+      setDashLogs(prev => [`[${new Date().toLocaleTimeString()}] ⚠️ GEMINI ERROR: API call failed.`, ...prev]);
+    } finally {
+      setIsTriageLoading(false);
+    }
   };
 
   return (

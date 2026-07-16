@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { MessageSquare, Send, X, Bot, User, Sparkles, Volume2, VolumeX, AlertOctagon, HelpCircle, Star, Check } from "lucide-react";
 import { Facility } from "./LeafletMap";
+import { askGemini } from "../lib/gemini";
 
 interface Message {
   id: string;
@@ -200,10 +201,26 @@ export default function AIChatbot({
     synthRef.current.speak(utterance);
   };
 
-  // Heuristic Response Engine (Simulated IBM Granite 13B)
-  const generateGraniteResponse = (userText: string): string => {
+  // Real Gemini AI Response
+  const generateGraniteResponse = async (userText: string): Promise<string> => {
     const textLower = userText.toLowerCase().trim();
 
+    const systemContext = `You are an expert disaster response AI assistant integrated into a real-time emergency operations dashboard.
+Current disaster: ${disasterName}
+Location: ${locationName} (Lat: ${lat}, Lng: ${lng})
+Severity: ${severity}
+Power Grid: ${gridStatus}
+Nearby facilities: ${facilities.map(f => f.name).join(", ") || "None found yet"}
+
+Provide concise, actionable emergency advice. Be direct and prioritize life safety.`;
+
+    try {
+      return await askGemini(`${systemContext}\n\nUser question: ${userText}`);
+    } catch (err) {
+      console.error("Gemini API error:", err);
+    }
+
+    // Fallback if API fails
     // 1. "What should I do?"
     if (textLower === "what should i do?" || textLower.includes("what should i do")) {
       if (disasterId === "floods") {
@@ -443,17 +460,8 @@ Regional satellite and cellular warning systems are operational.
 * If sirens sound, check your mobile device immediately for broadcast translations in [${languageCode}].`;
     }
 
-    // General Fallback representing a smart responder LLM
-    return `### IBM Granite 13B Tactical Assistant:
-**Inquiry Logged:** "${userText}"
-**Sector Context:** ${locationName} | active Epicenter: ${lat}, ${lng} | Threat level: \`${severity}\`.
-
-Based on IBM Granite 13B dispatch heuristics, please prioritize:
-1. **Physical Safety First:** Evacuate early if hazard margins decrease.
-2. **Unified Command:** Coordinate with local responder crews (${42} active teams in field).
-3. **Asset Verification:** Refer to your nearby facilities index to locate hospitals and police depots.
-
-Is there a specific detail regarding **shelters**, **drinking water**, or **evacuation checklists** you would like me to analyze?`;
+    // General Fallback
+    return `Emergency advisory for ${disasterName} at ${locationName}: Stay safe, follow official instructions, and contact emergency services if needed.`;
   };
 
   const handleSend = () => {
@@ -470,15 +478,12 @@ Is there a specific detail regarding **shelters**, **drinking water**, or **evac
     setInput("");
     setIsTyping(true);
 
-    // Stop speaking if currently active
     if (synthRef.current) {
       synthRef.current.cancel();
       setSpeakingId(null);
     }
 
-    // Simulate Granite inference latency
-    setTimeout(() => {
-      const replyText = generateGraniteResponse(userMsg.text);
+    generateGraniteResponse(userMsg.text).then(replyText => {
       const botMsg: Message = {
         id: "msg_" + (Date.now() + 1),
         sender: "bot",
@@ -487,7 +492,7 @@ Is there a specific detail regarding **shelters**, **drinking water**, or **evac
       };
       setMessages(prev => [...prev, botMsg]);
       setIsTyping(false);
-    }, 1000);
+    });
   };
 
   return (
