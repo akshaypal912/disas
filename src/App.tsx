@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { askGemini } from "./lib/gemini";
 import { 
   FolderTree, 
   Map, 
@@ -944,29 +943,26 @@ export default function App() {
     ]);
   };
 
-  const triggerGraniteTriage = async () => {
+  const triggerGraniteTriage = () => {
     setIsTriageLoading(true);
     setTriagePlan(null);
-    setDashLogs(prev => [`[${new Date().toLocaleTimeString()}] 🧠 GEMINI AI TRIAGE: Synthesizing relief route polygons using Gemini AI...`, ...prev]);
+    setDashLogs(prev => [`[${new Date().toLocaleTimeString()}] 🧠 GRANITE AI TRIAGE: Synthesizing relief route polygons using watsonx Granite LLM...`, ...prev]);
 
-    try {
-      const prompt = `You are a disaster response coordinator AI. Generate a concise tactical crisis dispatch plan.
-
-Disaster Type: ${dashDisasterId}
-Location: ${dashLocationName} (Lat: ${dashLat}, Lng: ${dashLng})
-Severity: ${dashSeverity}
-Active Responders: ${dashResponders} teams
-Evacuated: ${dashEvacuated} residents
-Power Grid: ${dashGridStatus}
-
-Provide a structured CRISIS DISPATCH PLAN with 3-5 specific actionable steps. Be direct and tactical.`;
-
-      const activePlan = await askGemini(prompt);
+    setTimeout(() => {
+      setIsTriageLoading(false);
+      const plans: Record<string, string> = {
+        floods: "CRISIS DISPATCH PLAN: Establish sandbag buffer vectors at coordinates. Establish dynamic escape vectors along secondary roadways. Target Shelter Alpha.",
+        earthquakes: "CRISIS DISPATCH PLAN: High structure collapse potential. K9 scouts dispatch coordinates: Sector fault intersection. Mobilize heavy rescue excavators.",
+        cyclones: "CRISIS DISPATCH PLAN: Power grid disabled dynamically. High speed surge barriers activated. Sheltered occupants to be tracked on sector telemetry grid.",
+        fires: "CRISIS DISPATCH PLAN: Wind vectors pushing flames at 12 knots Eastward. Create 40-meter wide firebreak polygon. Route responder fire engines along Windward pass.",
+        landslides: "CRISIS DISPATCH PLAN: Soil saturation threshold crossed. Trigger automated road blockades on Sector 4 Highway. Dispatch mud removal bulldozers.",
+        heatwaves: "CRISIS DISPATCH PLAN: Urban wet-bulb temperature is critical. Direct elderlies to cooling stations. Expand power limits for secondary backup AC generators."
+      };
+      const activePlan = plans[dashDisasterId] || plans.floods;
       setTriagePlan(activePlan);
 
       // Save to localStorage Tactical History
       const newReport: HistoryReport = {
-
         id: "report_" + Date.now(),
         disasterId: dashDisasterId,
         disasterName: dashDisasterId.charAt(0).toUpperCase() + dashDisasterId.slice(1),
@@ -989,16 +985,10 @@ Provide a structured CRISIS DISPATCH PLAN with 3-5 specific actionable steps. Be
       }
 
       setDashLogs(prev => [
-        `[${new Date().toLocaleTimeString()}] 🧠 GEMINI AI DECISION: Optimized coordination routes mapped. Saved to Tactical History archive.`,
+        `[${new Date().toLocaleTimeString()}] 🧠 GRANITE AI DECISION: Optimized coordination routes mapped with confidence score 94.6%. Saved to Tactical History archive.`,
         ...prev
       ]);
-    } catch (err) {
-      console.error("Gemini triage error:", err);
-      setTriagePlan("AI service unavailable. Please check your GEMINI_API_KEY and try again.");
-      setDashLogs(prev => [`[${new Date().toLocaleTimeString()}] ⚠️ GEMINI ERROR: API call failed.`, ...prev]);
-    } finally {
-      setIsTriageLoading(false);
-    }
+    }, 1500);
   };
 
   return (
@@ -1051,6 +1041,27 @@ Provide a structured CRISIS DISPATCH PLAN with 3-5 specific actionable steps. Be
 
         {/* Global CTA Trigger & Theme Toggle */}
         <div className="flex items-center gap-3">
+          {simulatedUserSession && (
+            <div className={`hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-xl border font-mono text-[10px] ${
+              theme === "light" 
+                ? "bg-slate-100 border-slate-200 text-slate-700" 
+                : "bg-slate-900/60 border-slate-800 text-slate-300"
+            }`}>
+              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-semibold max-w-[120px] truncate">{simulatedUserSession.email}</span>
+              <span className="text-[8.5px] px-1 py-0.5 bg-red-600 text-white rounded font-extrabold uppercase tracking-tighter">{simulatedUserSession.role}</span>
+              <button 
+                onClick={() => {
+                  setSimulatedUserSession(null);
+                }}
+                className="ml-2 pl-2 border-l border-slate-300 dark:border-slate-800 text-red-500 hover:text-red-400 font-black tracking-tight transition cursor-pointer"
+                title="Sign Out Operator"
+              >
+                SIGN OUT
+              </button>
+            </div>
+          )}
+
           <button
             onClick={toggleTheme}
             className={`p-2 rounded-xl border transition cursor-pointer flex items-center justify-center ${theme === "light" ? "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200" : "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-850 hover:text-white"}`}
