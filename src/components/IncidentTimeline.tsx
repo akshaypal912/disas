@@ -134,19 +134,20 @@ export function IncidentTimeline({
     }
   }, [idToken, disasterId, fetchTimeline, onAddLog]);
 
-  // Auto-generate starting timeline events if queue is empty
+  // FIX HIGH #11: Use a ref flag to prevent duplicate seeding caused by the race between
+  // fetchTimeline (async, sets loading=true) and this effect checking !loading.
+  const seedingRef = React.useRef(false);
+
   useEffect(() => {
-    if (idToken && disasterId && events.length === 0 && !loading) {
-      // If we don't have events, seed initial ones based on current state
+    if (idToken && disasterId && events.length === 0 && !loading && !seedingRef.current) {
+      seedingRef.current = true;
       const seedInitialEvents = async () => {
         setLoading(true);
-        // Location Detected
         await addTimelineEvent(
           "Location Detected",
-          `Gps/Sector coordinates locked at (${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)})`,
+          `GPS/Sector coordinates locked at (${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)})`,
           "location_detected"
         );
-        // Disaster Selected
         await addTimelineEvent(
           "Disaster Selected",
           `Active emergency alert set to ${disasterName.toUpperCase()} threat profile.`,

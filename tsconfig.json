@@ -23,5 +23,6 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "exclude": ["frontend"]
+  "include": ["src", "server.ts", "vitest.config.ts"],
+  "exclude": ["frontend", "node_modules", "dist"]
 }

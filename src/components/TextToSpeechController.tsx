@@ -15,11 +15,18 @@ export function TextToSpeechController({ textToRead, languageCode, title }: Text
       window.speechSynthesis.cancel();
       setSpeaking(false);
     } else {
+      // FIX LOW #24: Guard against environments where speech synthesis is unavailable
+      if (!window.speechSynthesis) {
+        console.warn("[TTS] speechSynthesis not available in this environment.");
+        return;
+      }
       const u = new SpeechSynthesisUtterance(textToRead);
       if (languageCode) {
         u.lang = languageCode;
       }
       u.onend = () => setSpeaking(false);
+      // FIX LOW #24: Handle synthesis errors so button doesn't get stuck in "speaking" state
+      u.onerror = () => setSpeaking(false);
       window.speechSynthesis.speak(u);
       setSpeaking(true);
     }

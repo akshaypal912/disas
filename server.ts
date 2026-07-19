@@ -134,6 +134,44 @@ function getFallbackDisasterGuidance(disasterType: string, userLocation: string,
   }
 }
 
+// FIX LOW #27: Moved to module scope so it can be tested independently
+function getFallbackSeverityClass(
+  disasterType: string,
+  affectedUsers: number,
+  hospitalsCount: number
+): { severity: string; reasoning: string } {
+  let severity = "LOW";
+  let reason = "";
+
+  const dTypeLower = disasterType.toLowerCase();
+  const isHighRiskDisaster =
+    dTypeLower.includes("fire") ||
+    dTypeLower.includes("earthquake") ||
+    dTypeLower.includes("cyclone") ||
+    dTypeLower.includes("flood");
+
+  if (affectedUsers > 2000) {
+    severity = "CRITICAL";
+    reason = `Extremely high density of affected individuals (${affectedUsers} users) with active ${disasterType} threatening life and grid infrastructure.`;
+  } else if (affectedUsers > 500 || (isHighRiskDisaster && affectedUsers > 200)) {
+    severity = "HIGH";
+    reason = `Significant population affected (${affectedUsers} users) with high risk of escalating damage from active ${disasterType}.`;
+  } else if (affectedUsers > 50 || isHighRiskDisaster) {
+    severity = "MEDIUM";
+    reason = `Moderate population impact for active ${disasterType}. Localized response resources are currently sufficient.`;
+  } else {
+    severity = "LOW";
+    reason = `Minor population impact (${affectedUsers} users). Handled entirely by primary municipal responder units.`;
+  }
+
+  if (hospitalsCount === 0 && (severity === "HIGH" || severity === "MEDIUM")) {
+    severity = severity === "HIGH" ? "CRITICAL" : "HIGH";
+    reason += " Proximity warning: No operational hospital facilities detected within active sector radius.";
+  }
+
+  return { severity, reasoning: reason };
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -160,7 +198,7 @@ async function startServer() {
       const uid = req.user!.uid;
       const { disasterId, severity, lat, lng, message } = req.body;
       const log = await createLog(uid, disasterId, severity, lat, lng, message);
-      
+
       const ioInstance = app.get("io");
       if (ioInstance) {
         ioInstance.emit("disaster_update", {
@@ -202,11 +240,20 @@ async function startServer() {
   });
 
   // API Route - save user feedback
+  // FIX MEDIUM #19: Validate required fields before hitting the database
   app.post("/api/feedback", requireAuth, async (req: AuthRequest, res) => {
     try {
       const uid = req.user!.uid;
       const { rating, comments } = req.body;
-      const feedbackRecord = await createFeedback(uid, rating, comments);
+
+      if (!comments || typeof comments !== "string" || comments.trim() === "") {
+        return res.status(400).json({ error: "comments field is required and cannot be empty." });
+      }
+      if (typeof rating !== "number" || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: "rating must be a number between 1 and 5." });
+      }
+
+      const feedbackRecord = await createFeedback(uid, rating, comments.trim());
       res.json({ success: true, feedback: feedbackRecord });
     } catch (error: any) {
       console.error("Error creating feedback:", error);
@@ -232,7 +279,7 @@ async function startServer() {
       const uid = req.user!.uid;
       const { disasterId, title, description, status } = req.body;
       const timelineRecord = await createTimelineEvent(uid, disasterId, title, description, status);
-      
+
       const ioInstance = app.get("io");
       if (ioInstance) {
         ioInstance.emit("timeline_event_added", {
@@ -262,9 +309,10 @@ async function startServer() {
   });
 
   // API Route - Google Gemini disaster analysis pipeline
+  // FIX CRITICAL #4: Corrected model name from "gemini-3.5-flash" to "gemini-2.0-flash"
   app.post("/api/disaster", async (req, res) => {
     const { disasterType, userLocation, userQuery, selectedLanguage } = req.body;
-    
+
     const dType = disasterType || "Floods";
     const uLoc = userLocation || "Unknown Location";
     const uQuery = userQuery || "What are the immediate survival and evacuation protocols?";
@@ -272,7 +320,7 @@ async function startServer() {
 
     try {
       const client = getGeminiClient();
-      
+
       const contents = `Analyze this disaster context:
 Disaster Type: ${dType}
 User Location: ${uLoc}
@@ -282,7 +330,7 @@ Selected Language: ${sLang}
 Provide structured, highly precise tactical and lifesaving emergency coordinator guidance. Ensure the entire response is returned fully translated into the requested language (language code: ${sLang}).`;
 
       const response = await client.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.0-flash",
         contents,
         config: {
           responseMimeType: "application/json",
@@ -363,40 +411,11 @@ Provide structured, highly precise tactical and lifesaving emergency coordinator
     }
   });
 
-  // Local fallback severity classification helper
-  function getFallbackSeverityClass(disasterType: string, affectedUsers: number, hospitalsCount: number): { severity: string, reasoning: string } {
-    let severity = "LOW";
-    let reason = "";
-
-    const dTypeLower = disasterType.toLowerCase();
-    const isHighRiskDisaster = dTypeLower.includes("fire") || dTypeLower.includes("earthquake") || dTypeLower.includes("cyclone") || dTypeLower.includes("flood");
-
-    if (affectedUsers > 2000) {
-      severity = "CRITICAL";
-      reason = `Extremely high density of affected individuals (${affectedUsers} users) with active ${disasterType} threatening life and grid infrastructure.`;
-    } else if (affectedUsers > 500 || (isHighRiskDisaster && affectedUsers > 200)) {
-      severity = "HIGH";
-      reason = `Significant population affected (${affectedUsers} users) with high risk of escalating damage from active ${disasterType}.`;
-    } else if (affectedUsers > 50 || isHighRiskDisaster) {
-      severity = "MEDIUM";
-      reason = `Moderate population impact for active ${disasterType}. Localized response resources are currently sufficient.`;
-    } else {
-      severity = "LOW";
-      reason = `Minor population impact (${affectedUsers} users). Handled entirely by primary municipal responder units.`;
-    }
-
-    if (hospitalsCount === 0 && (severity === "HIGH" || severity === "MEDIUM")) {
-      severity = severity === "HIGH" ? "CRITICAL" : "HIGH";
-      reason += " Proximity warning: No operational hospital facilities detected within active sector radius.";
-    }
-
-    return { severity, reasoning: reason };
-  }
-
   // API Route - automatically classify incident severity using AI
+  // FIX CRITICAL #4: Corrected model name from "gemini-3.5-flash" to "gemini-2.0-flash"
   app.post("/api/severity/classify", async (req, res) => {
     const { disasterType, locationName, lat, lng, affectedUsers, nearbyHospitals } = req.body;
-    
+
     const dType = disasterType || "Floods";
     const locName = locationName || "Unknown Location";
     const latitude = lat || "0";
@@ -406,7 +425,7 @@ Provide structured, highly precise tactical and lifesaving emergency coordinator
 
     try {
       const client = getGeminiClient();
-      
+
       const contents = `You are an AI disaster coordinator. Your task is to analyze the active disaster context and automatically classify the incident severity.
 Context details:
 - Disaster Type: ${dType}
@@ -425,20 +444,20 @@ Assign exactly one of these severity levels: "LOW", "MEDIUM", "HIGH", or "CRITIC
 Provide a clear, brief (1-2 sentences) reasoning for this classification.`;
 
       const response = await client.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.0-flash",
         contents,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              severity: { 
-                type: Type.STRING, 
-                description: "Must be exactly one of: 'LOW', 'MEDIUM', 'HIGH', or 'CRITICAL'." 
+              severity: {
+                type: Type.STRING,
+                description: "Must be exactly one of: 'LOW', 'MEDIUM', 'HIGH', or 'CRITICAL'."
               },
-              reasoning: { 
-                type: Type.STRING, 
-                description: "A very concise explanation (1-2 sentences) explaining the AI risk analysis and why this severity level was assigned." 
+              reasoning: {
+                type: Type.STRING,
+                description: "A very concise explanation (1-2 sentences) explaining the AI risk analysis and why this severity level was assigned."
               }
             },
             required: ["severity", "reasoning"]
@@ -482,6 +501,11 @@ Provide a clear, brief (1-2 sentences) reasoning for this classification.`;
     }
   });
 
+  // FIX MEDIUM #23: Explicit 404 handler for unmatched API routes — must come before the SPA catch-all
+  app.use("/api", (req, res) => {
+    res.status(404).json({ error: `API route not found: ${req.method} ${req.path}` });
+  });
+
   // Vite middleware for development or static file serving for production
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -492,15 +516,29 @@ Provide a clear, brief (1-2 sentences) reasoning for this classification.`;
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
+    // SPA catch-all — only non-API GET requests reach here
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
   const httpServer = http.createServer(app);
+
+  // FIX LOW #28: Restrict Socket.IO CORS to whitelisted origins instead of wildcard "*"
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim())
+    : ["http://localhost:3000", "http://localhost:5173"];
+
   const io = new SocketIOServer(httpServer, {
     cors: {
-      origin: "*",
+      origin: (origin, callback) => {
+        // Allow requests with no origin (server-to-server) and whitelisted origins
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error(`CORS: origin ${origin} not allowed`));
+        }
+      },
       methods: ["GET", "POST"]
     }
   });
@@ -510,14 +548,14 @@ Provide a clear, brief (1-2 sentences) reasoning for this classification.`;
   io.on("connection", (socket) => {
     console.log(`[Socket.IO] Client connected: ${socket.id}`);
     connectedSockets.add(socket.id);
-    
+
     // Broadcast active users count
     io.emit("online_users", connectedSockets.size);
 
     socket.on("disaster_update", (data) => {
       console.log("[Socket.IO] disaster_update:", data);
       socket.broadcast.emit("disaster_update", data);
-      
+
       socket.broadcast.emit("notification", {
         type: "disaster",
         message: `🚨 DISASTER UPDATE: ${data.disasterName || data.disasterId} at ${data.locationName || 'updated epicenter'}. Severity: ${data.severity}`,

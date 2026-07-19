@@ -22,8 +22,8 @@ export function LoginPage({ onLoginSuccess, theme }: LoginPageProps) {
     try {
       const result = await signInWithPopup(auth, googleAuthProvider);
       const token = await result.user.getIdToken();
-      
-      // Register with Cloud SQL session API
+
+      // Register / upsert user in the database and retrieve their role
       const res = await fetch("/api/auth/session", {
         method: "POST",
         headers: {
@@ -32,11 +32,14 @@ export function LoginPage({ onLoginSuccess, theme }: LoginPageProps) {
         }
       });
       const data = await res.json();
-      
+
+      // Use the role returned by the server if available, fall back to 'coordinator'
+      const role = data?.user?.role || 'coordinator';
+
       onLoginSuccess({
         email: result.user.email || 'operator@resp.ai',
-        role: 'coordinator',
-        token: token,
+        role,
+        token,
       });
     } catch (err: any) {
       console.error("Google login failed:", err);
@@ -76,20 +79,35 @@ export function LoginPage({ onLoginSuccess, theme }: LoginPageProps) {
     setIsEmailLoading(true);
     setErrorMsg(null);
     try {
-      // Simulate credential match
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      if (email.toLowerCase() === 'commander@resp.ai' || password.length >= 6) {
-        const mockToken = `mock_token_email_${Date.now()}`;
-        onLoginSuccess({
-          email: email,
-          role: 'coordinator',
-          token: mockToken,
-        });
-      } else {
-        throw new Error("Invalid credential level. Enter password with at least 6 characters.");
-      }
+      const { signInWithEmailAndPassword } = await import('firebase/auth');
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const token = await result.user.getIdToken();
+
+      // Register / upsert user in the database
+      await fetch("/api/auth/session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      onLoginSuccess({
+        email: result.user.email || email,
+        role: 'coordinator',
+        token,
+      });
     } catch (err: any) {
-      setErrorMsg(err.message || "Authentication credentials rejected.");
+      const code = err?.code || '';
+      if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+        setErrorMsg("Invalid email or password. Please try again.");
+      } else if (code === 'auth/too-many-requests') {
+        setErrorMsg("Too many failed attempts. Please wait before retrying.");
+      } else if (code === 'auth/invalid-email') {
+        setErrorMsg("Invalid email address format.");
+      } else {
+        setErrorMsg(err.message || "Authentication credentials rejected.");
+      }
     } finally {
       setIsEmailLoading(false);
     }
@@ -232,8 +250,9 @@ export function LoginPage({ onLoginSuccess, theme }: LoginPageProps) {
             <Terminal className="h-3 w-3 text-red-500" />
             <span>Connection Secure • TLS 1.3 Certified</span>
           </p>
+          {/* FIX LOW #25: Removed false claim about "RESP-AI Defense Network" monitoring */}
           <p className="text-[9px] text-slate-600 max-w-xs mx-auto leading-normal">
-            Unauthorized access attempts are logged and monitored by the RESP-AI Defense Network. Standard regulatory compliance standards apply.
+            All access attempts are logged for security purposes. Unauthorized access is prohibited.
           </p>
         </div>
 

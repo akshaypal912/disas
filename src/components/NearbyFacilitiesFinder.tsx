@@ -121,7 +121,8 @@ export function NearbyFacilitiesFinder({
       } catch (err: any) {
         if (!active) return;
         console.warn('NearbyFacilitiesFinder: Failed to load real-time OSM data. Generating dynamic localized backup.', err);
-        setErrorStatus('OSM Live API unavailable, utilizando respaldo localizado.');
+        // FIX LOW #26: Consistent English error message
+        setErrorStatus('OSM Live API unavailable. Using local fallback data.');
 
         // Premium dynamic fallback based on coordinates
         const fallbackTypes: ('hospital' | 'shelter' | 'police' | 'fire')[] = ['hospital', 'shelter', 'police', 'fire', 'shelter'];

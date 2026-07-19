@@ -156,7 +156,9 @@ export function WeatherPanel({ dashLat, dashLng }: WeatherPanelProps) {
       const estimatedTemp = Math.round((baseTemp + (tempSeed * 8)) * 10) / 10;
       const estimatedHumidity = Math.min(100, Math.max(10, Math.round(60 + (tempSeed * 25))));
       const estimatedWind = Math.round((12 + (Math.cos(lat) * 10)) * 10) / 10;
-      const estimatedRainProb = estimatedHumidity > 75 ? Math.round((estimatedHumidity - 40) * 1.2) : Math.round(estimatedHumidity * 0.5);
+      // FIX MEDIUM #20: Clamp rain probability to [0, 100] — the formula can exceed 100%
+      const rawRainProb = estimatedHumidity > 75 ? Math.round((estimatedHumidity - 40) * 1.2) : Math.round(estimatedHumidity * 0.5);
+      const estimatedRainProb = Math.min(100, Math.max(0, rawRainProb));
 
       let condition = 'Partly Cloudy';
       let description = 'Scattered clouds and gentle winds';

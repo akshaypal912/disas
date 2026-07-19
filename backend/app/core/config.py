@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "https://placeholder.supabase.co")
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "placeholder_anon_key")
     SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "placeholder_service_key")
+    # FIX HIGH #14: Added missing SUPABASE_JWT_SECRET used by security.py for JWT verification
+    SUPABASE_JWT_SECRET: str = os.getenv("SUPABASE_JWT_SECRET", "placeholder_jwt_secret")
 
     # IBM watsonx AI Settings
     WATSONX_API_KEY: str = os.getenv("WATSONX_API_KEY", "placeholder_watsonx_key")

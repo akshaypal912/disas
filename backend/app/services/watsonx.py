@@ -8,14 +8,38 @@ class WatsonxService:
         self.api_key = settings.WATSONX_API_KEY
         self.project_id = settings.WATSONX_PROJECT_ID
         self.model_id = settings.WATSONX_GRANITE_MODEL_ID
+        # Cache the IAM token and its expiry to avoid re-fetching on every request
+        self._iam_token: str | None = None
+        self._iam_token_expiry: float = 0.0
 
     async def _get_iam_token(self) -> str:
         """
-        Retrieves a temporary IBM Cloud IAM token using the watsonx API Key.
+        FIX CRITICAL #3: Retrieves a real temporary IBM Cloud IAM token by
+        exchanging the API key at the IBM Cloud IAM endpoint.
+        Caches the token until it is within 60 seconds of expiring.
         """
-        # Placeholder mechanism for token retrieval. In production, this issues an HTTP POST to:
-        # https://iam.cloud.ibm.com/identity/token
-        return "mock-iam-token"
+        import time
+
+        # Return cached token if still valid (with a 60-second safety margin)
+        if self._iam_token and time.time() < self._iam_token_expiry - 60:
+            return self._iam_token
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(
+                "https://iam.cloud.ibm.com/identity/token",
+                data={
+                    "grant_type": "urn:ibm:params:oauth:grant-type:apikey",
+                    "apikey": self.api_key,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            response.raise_for_status()
+            token_data = response.json()
+
+        self._iam_token = token_data["access_token"]
+        # IBM IAM tokens expire after 3600 seconds; store absolute expiry time
+        self._iam_token_expiry = time.time() + int(token_data.get("expires_in", 3600))
+        return self._iam_token
 
     async def generate_tactical_plan(
         self, 
@@ -91,14 +115,31 @@ class WatsonxService:
                 response.raise_for_status()
                 result = response.json()
                 
-                # Extract and parse response matching LLM format instructions...
-                # For structural readiness we return the structure
-                return {
-                    "analysis_summary": "Successfully integrated watsonx Granite analysis.",
-                    "threat_assessment": "HIGH",
-                    "tactical_recommendations": ["Initiate evacuation along routes outlined in OSM overlays."],
-                    "confidence_rating": 0.9
-                }
+                # FIX HIGH #12: Parse the actual Granite response instead of returning a stub
+                generated_text = result.get("results", [{}])[0].get("generated_text", "").strip()
+
+                import json as _json
+                try:
+                    clean = generated_text
+                    if "```json" in clean:
+                        clean = clean.split("```json")[1].split("```")[0].strip()
+                    elif "```" in clean:
+                        clean = clean.split("```")[1].split("```")[0].strip()
+                    parsed = _json.loads(clean)
+                    return {
+                        "analysis_summary": parsed.get("analysis_summary", generated_text),
+                        "threat_assessment": parsed.get("threat_assessment", "UNKNOWN"),
+                        "tactical_recommendations": parsed.get("tactical_recommendations", [generated_text]),
+                        "confidence_rating": float(parsed.get("confidence_rating", 0.8)),
+                    }
+                except Exception:
+                    # If JSON parsing fails, wrap the raw text gracefully
+                    return {
+                        "analysis_summary": generated_text,
+                        "threat_assessment": "UNKNOWN",
+                        "tactical_recommendations": [generated_text],
+                        "confidence_rating": 0.5,
+                    }
             except Exception as e:
                 # Fallback to local mock reporting if the endpoint is offline
                 return {
