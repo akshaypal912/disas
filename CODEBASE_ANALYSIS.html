@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Disaster Response Platform — Codebase Analysis</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #1f2328;
+    background: #ffffff;
+    padding: 32px 16px;
+  }
+  .container { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .meta { color: #57606a; font-size: 13px; margin-bottom: 28px; border-bottom: 1px solid #e5e7eb; padding-bottom: 16px; }
+  .meta span { margin-right: 16px; }
+
+  /* Summary bar */
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 32px; }
+  .stat-card { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 12px; text-align: center; }
+  .stat-card .num { font-size: 26px; font-weight: 800; }
+  .stat-card .lbl { font-size: 11px; color: #57606a; text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+  .num.red { color: #dc2626; }
+  .num.orange { color: #ea580c; }
+  .num.amber { color: #d97706; }
+  .num.blue { color: #3b82d4; }
+
+  /* Section */
+  h2 { font-size: 15px; font-weight: 700; margin: 28px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #e5e7eb; display: flex; align-items: center; gap: 6px; }
+  h2 .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 12px; }
+  .bg-red { background: #fee2e2; color: #991b1b; }
+  .bg-orange { background: #ffedd5; color: #9a3412; }
+  .bg-amber { background: #fef9c3; color: #92400e; }
+  .bg-blue { background: #dbeafe; color: #1e40af; }
+  .bg-slate { background: #f1f5f9; color: #475569; }
+
+  /* Finding card */
+  .finding { border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+  .finding-header { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px 10px; background: #f7f8fa; border-bottom: 1px solid #e5e7eb; }
+  .finding-header .sev { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; white-space: nowrap; flex-shrink: 0; margin-top: 2px; text-transform: uppercase; letter-spacing: .04em; }
+  .sev-critical { background: #fee2e2; color: #991b1b; }
+  .sev-high { background: #ffedd5; color: #9a3412; }
+  .sev-medium { background: #fef9c3; color: #92400e; }
+  .sev-low { background: #f1f5f9; color: #475569; }
+  .finding-title { font-weight: 600; font-size: 13.5px; }
+  .finding-file { font-size: 11px; color: #57606a; font-family: "Cascadia Code", "Fira Mono", monospace; margin-top: 2px; }
+  .finding-body { padding: 12px 14px; font-size: 13px; line-height: 1.65; }
+  .finding-body p { margin-bottom: 6px; }
+  .finding-body p:last-child { margin-bottom: 0; }
+  code { font-family: "Cascadia Code", "Fira Mono", "Courier New", monospace; font-size: 12px; background: #f1f5f9; padding: 1px 5px; border-radius: 4px; color: #0f172a; }
+  .tag-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .tag { font-size: 10px; background: #e0f2fe; color: #0369a1; padding: 1px 7px; border-radius: 10px; font-weight: 600; }
+  .tag.t-sec { background: #fce7f3; color: #9d174d; }
+  .tag.t-db { background: #dcfce7; color: #166534; }
+  .tag.t-api { background: #ede9fe; color: #5b21b6; }
+  .tag.t-ui { background: #fff7ed; color: #9a3412; }
+  .tag.t-ai { background: #f0fdf4; color: #15803d; }
+
+  /* Architecture table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  th { background: #f7f8fa; border: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; font-weight: 600; font-size: 12px; color: #374151; }
+  td { border: 1px solid #e5e7eb; padding: 8px 10px; vertical-align: top; }
+  tr:hover td { background: #fafafa; }
+  .dot-ok { color: #16a34a; font-weight: 700; }
+  .dot-warn { color: #d97706; font-weight: 700; }
+  .dot-err { color: #dc2626; font-weight: 700; }
+
+  footer { margin-top: 48px; padding-top: 14px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #57606a; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Disaster Response Platform — Deep Codebase Analysis</h1>
+  <div class="meta">
+    <span>Repository: <strong>ooseni/Disaster-Response-Platform</strong></span>
+    <span>Stack: React 18 + TypeScript / FastAPI (Python) / Express.js / Supabase + Postgres</span>
+    <span>AI: Gemini (server) + IBM watsonx Granite (backend)</span>
+  </div>
+
+  <div class="summary-grid">
+    <div class="stat-card"><div class="num red">6</div><div class="lbl">Critical</div></div>
+    <div class="stat-card"><div class="num orange">9</div><div class="lbl">High</div></div>
+    <div class="stat-card"><div class="num amber">8</div><div class="lbl">Medium</div></div>
+    <div class="stat-card"><div class="num blue">7</div><div class="lbl">Low / Missing Feature</div></div>
+  </div>
+
+
+  <!-- CRITICAL -->
+  <h2>🔴 Critical Issues <span class="badge bg-red">Bugs / Security</span></h2>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-critical">Critical</span>
+      <div>
+        <div class="finding-title">Fake authentication — any password ≥ 6 chars grants coordinator access</div>
+        <div class="finding-file">src/components/LoginPage.tsx : handleEmailSignIn()</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>The email/password login route never calls Firebase or any real authentication service. The condition is <code>if (email === 'commander@resp.ai' || password.length &gt;= 6)</code> — meaning <em>any</em> account with a password of 6+ characters is granted full Coordinator (admin) access with a mock token. This bypasses all RBAC entirely.</p>
+      <p>Any user who clicks "Sign In" with any email and any 6-character password gets a <code>mockToken</code> accepted by the rest of the app as a real session.</p>
+      <div class="tag-list"><span class="tag t-sec">Security</span><span class="tag t-sec">RBAC Bypass</span><span class="tag t-sec">Auth</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-critical">Critical</span>
+      <div>
+        <div class="finding-title">Mock tokens accepted by server API routes — authentication is illusory</div>
+        <div class="finding-file">server.ts : requireAuth middleware / src/middleware/auth.ts</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>The Express server uses <code>requireAuth</code> which calls <code>adminAuth.verifyIdToken(token)</code> from Firebase Admin. However, the simulated access path in LoginPage produces tokens like <code>mock_token_coordinator_&lt;timestamp&gt;</code>. These will fail Firebase Admin verification, meaning every API call (<code>/api/logs</code>, <code>/api/feedback</code>, <code>/api/timeline</code>) will return 401 for simulated sessions — the SOS queue sync will silently fail.</p>
+      <div class="tag-list"><span class="tag t-sec">Security</span><span class="tag t-api">API</span><span class="tag t-sec">Broken Auth Flow</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-critical">Critical</span>
+      <div>
+        <div class="finding-title">IBM watsonx IAM token is a hardcoded string "mock-iam-token" — real LLM calls always fail</div>
+        <div class="finding-file">backend/app/services/watsonx.py : _get_iam_token()</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p><code>_get_iam_token()</code> simply <code>return "mock-iam-token"</code> with a comment saying it is a "placeholder mechanism." Even when a real <code>WATSONX_API_KEY</code> is provided, HTTP requests to <code>/ml/v4/generation</code> are sent with <code>Authorization: Bearer mock-iam-token</code> and will be rejected with HTTP 401 by IBM Cloud.</p>
+      <p>The actual IAM exchange endpoint (<code>https://iam.cloud.ibm.com/identity/token</code>) is mentioned in a comment but never implemented.</p>
+      <div class="tag-list"><span class="tag t-ai">AI / LLM</span><span class="tag t-api">IBM watsonx</span><span class="tag t-sec">Credentials</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-critical">Critical</span>
+      <div>
+        <div class="finding-title">Gemini model name "gemini-3.5-flash" does not exist — all AI triage calls fail</div>
+        <div class="finding-file">server.ts : lines 286, 431</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>Both the <code>/api/disaster</code> and <code>/api/severity/classify</code> routes call <code>client.models.generateContent({ model: "gemini-3.5-flash", ... })</code>. The real model identifier is <code>gemini-1.5-flash</code> or <code>gemini-2.0-flash</code>. An invalid model name causes a 404, causing every chat query to silently fall back to the static hardcoded <code>getFallbackDisasterGuidance()</code> function with no indication to the user.</p>
+      <div class="tag-list"><span class="tag t-ai">AI / LLM</span><span class="tag t-api">Gemini API</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-critical">Critical</span>
+      <div>
+        <div class="finding-title">SSL disabled on Postgres connection pool — data transmitted in plaintext</div>
+        <div class="finding-file">src/db/index.ts : createPool()</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>The database connection pool is created with <code>ssl: false</code>. Cloud-hosted Postgres instances (Google Cloud SQL, Supabase, AWS RDS) typically require TLS connections. In production this sends SOS events, user credentials, and emergency logs over an unencrypted channel. It will also silently fail to connect on Cloud SQL instances that enforce SSL.</p>
+      <div class="tag-list"><span class="tag t-sec">Security</span><span class="tag t-db">Database</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-critical">Critical</span>
+      <div>
+        <div class="finding-title">Health check endpoint hard-codes "connected: true" regardless of real state</div>
+        <div class="finding-file">backend/app/main.py : health_check()</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>The <code>GET /</code> health endpoint unconditionally returns <code>"database_connected": True, "llm_connected": True</code> without actually pinging the Supabase database or the watsonx service. Any monitoring system relying on this endpoint will incorrectly report the service as healthy even when both are completely unreachable.</p>
+      <div class="tag-list"><span class="tag t-api">API</span><span class="tag t-db">Observability</span></div>
+    </div>
+  </div>
+
+
+  <!-- HIGH -->
+  <h2>🟠 High Severity Issues <span class="badge bg-orange">Bugs / Broken Features</span></h2>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-high">High</span>
+      <div>
+        <div class="finding-title">Python backend CRUD endpoints return mock IDs — Supabase is never actually written to</div>
+        <div class="finding-file">backend/app/api/v1/endpoints/disaster.py, alerts.py, resources.py</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>All three Python endpoint files return hardcoded mock responses like <code>"id": "mock-disaster-id-abc"</code> and never call <code>get_supabase_client()</code>. The <code>GET</code> list endpoints always return an empty array. The <code>supabase.py</code> client is defined but completely unused in the route handlers.</p>
+      <div class="tag-list"><span class="tag t-api">API</span><span class="tag t-db">Supabase</span><span class="tag t-sec">Unimplemented</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-high">High</span>
+      <div>
+        <div class="finding-title">Two completely separate, incompatible database systems in use simultaneously</div>
+        <div class="finding-file">src/db/ (Drizzle + Postgres) vs supabase/ (Supabase RLS) vs backend/ (Supabase Python)</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>The project runs <strong>three distinct data stores</strong> that are architecturally incompatible:</p>
+      <p>1. <strong>Express server (Node.js)</strong> uses Drizzle ORM against a raw Postgres TCP pool with a <code>users/logs/feedback/timeline_events</code> schema.</p>
+      <p>2. <strong>Python FastAPI backend</strong> uses the Supabase Python client against a completely different schema (<code>profiles/disasters/resources/alerts/shelters</code>).</p>
+      <p>3. <strong>Two Supabase SQL files</strong> define yet another conflicting schema with different table names (<code>users</code> vs <code>profiles</code>, <code>requests</code> vs <code>disasters</code>).</p>
+      <div class="tag-list"><span class="tag t-db">Database</span><span class="tag t-db">Architecture</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-high">High</span>
+      <div>
+        <div class="finding-title">firebase-admin initialized without service account credentials — token verification will fail</div>
+        <div class="finding-file">src/lib/firebase-admin.ts</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p><code>firebase-admin</code> is initialized with only a <code>projectId</code> from the client-side JSON config file. Firebase Admin SDK requires a service account key (JSON) or Application Default Credentials (ADC) for server-side token verification. Without them, every call to <code>adminAuth.verifyIdToken(token)</code> will throw, breaking all protected API routes.</p>
+      <div class="tag-list"><span class="tag t-sec">Security</span><span class="tag t-sec">Firebase Admin</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-high">High</span>
+      <div>
+        <div class="finding-title">AIChatbot always returns static fallback — misleading "GEMINI PROXIED" label</div>
+        <div class="finding-file">src/components/AIChatbot.tsx : lines 127, 135</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>Due to the wrong model name (issue #4), every response the user sees is pre-written boilerplate, not live AI output, with no indication to the operator. In an emergency context this false confidence is dangerous.</p>
+      <div class="tag-list"><span class="tag t-ui">UI / UX</span><span class="tag t-ai">AI / LLM</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-high">High</span>
+      <div>
+        <div class="finding-title">IncidentTimeline auto-seeds duplicate events on every component remount</div>
+        <div class="finding-file">src/components/IncidentTimeline.tsx : lines 138–159</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>The seeding <code>useEffect</code> fires when <code>events.length === 0 &amp;&amp; !loading</code>. There is a race window where this briefly evaluates to true while a fetch is still in flight, leading to double-seeding on slow connections or re-renders caused by parent state changes.</p>
+      <div class="tag-list"><span class="tag t-ui">Race Condition</span><span class="tag t-db">Database</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-high">High</span>
+      <div>
+        <div class="finding-title">watsonx generate_tactical_plan() response parsing is fully stubbed — LLM output is discarded</div>
+        <div class="finding-file">backend/app/services/watsonx.py : lines 94–101</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>Even in the "real HTTP path", after the API call succeeds, the <code>result</code> variable is never parsed. The comment reads <em>"Extract and parse response matching LLM format instructions…"</em> followed by returning a second static hardcoded dict. The actual Granite response content is completely ignored.</p>
+      <div class="tag-list"><span class="tag t-ai">AI / LLM</span><span class="tag t-api">Unimplemented</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-high">High</span>
+      <div>
+        <div class="finding-title">SOS Queue syncs on every mount even when queue is empty — redundant Firebase token fetch</div>
+        <div class="finding-file">src/lib/sosQueue.ts : lines 248–251</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p><code>useSOSQueue</code> calls <code>syncQueue()</code> on mount whenever <code>navigator.onLine</code> is true, regardless of queue size. <code>syncQueue()</code> calls <code>getActiveToken()</code> which forces <code>auth.currentUser.getIdToken(true)</code> — a network round-trip to Firebase on every single page load.</p>
+      <div class="tag-list"><span class="tag t-ui">Performance</span><span class="tag t-sec">Token Leak</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-high">High</span>
+      <div>
+        <div class="finding-title">Supabase JWT secret is missing from config — Python JWT verification crashes at runtime</div>
+        <div class="finding-file">backend/app/core/config.py + backend/app/core/security.py</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p><code>settings.SUPABASE_JWT_SECRET</code> is referenced in <code>security.py</code> but never defined in <code>config.py</code>. This will raise an <code>AttributeError</code> at runtime when any protected Python route is accessed, immediately crashing the endpoint handler.</p>
+      <div class="tag-list"><span class="tag t-sec">Security</span><span class="tag t-api">Runtime Crash</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-high">High</span>
+      <div>
+        <div class="finding-title">LeafletMap initializes icons outside useEffect — causes SSR / module-load crash risk</div>
+        <div class="finding-file">src/components/LeafletMap.tsx : lines 45–102</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p><code>L.divIcon()</code> calls are made at component render time, not inside a <code>useEffect</code>. Leaflet requires a DOM environment. If the component renders server-side or in a test environment without a DOM, it will throw.</p>
+      <div class="tag-list"><span class="tag t-ui">Leaflet</span><span class="tag t-ui">SSR Risk</span></div>
+    </div>
+  </div>
+
+
+  <!-- MEDIUM -->
+  <h2>🟡 Medium Severity Issues <span class="badge bg-amber">Logic Bugs / Missing Validation</span></h2>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-medium">Medium</span>
+      <div>
+        <div class="finding-title">.env.example is missing all backend and Firebase credentials</div>
+        <div class="finding-file">.env.example</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>Missing: <code>SQL_HOST</code>, <code>SQL_USER</code>, <code>SQL_PASSWORD</code>, <code>SQL_DB_NAME</code>, <code>SUPABASE_URL</code>, <code>SUPABASE_KEY</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code>, <code>SUPABASE_JWT_SECRET</code>, <code>WATSONX_API_KEY</code>, <code>WATSONX_PROJECT_ID</code>, and Firebase Admin service account path. New contributors cannot set the project up from this file alone.</p>
+      <div class="tag-list"><span class="tag">DX</span><span class="tag t-db">Config</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-medium">Medium</span>
+      <div>
+        <div class="finding-title">Google sign-in ignores the /api/auth/session response — role always hardcoded to "coordinator"</div>
+        <div class="finding-file">src/components/LoginPage.tsx : handleGoogleSignIn() lines 36–40</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>After calling <code>/api/auth/session</code>, the returned <code>data</code> object is fetched but never read. The role is unconditionally set to <code>'coordinator'</code>, making all three RBAC levels (Coordinator / Responder / Observer) identical.</p>
+      <div class="tag-list"><span class="tag t-sec">RBAC</span><span class="tag t-ui">Auth</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-medium">Medium</span>
+      <div>
+        <div class="finding-title">TacticalHistory "Wipe Entire Log" ghost-data bug — DB records reappear on refresh</div>
+        <div class="finding-file">src/components/TacticalHistory.tsx : handleClearAll()</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p><code>handleClearAll</code> clears localStorage and sets in-memory <code>reports</code> to <code>[]</code>. However, DB logs are re-fetched from <code>/api/logs</code> on every mount. The user sees the wipe succeed, but the records return immediately on the next navigation or refresh.</p>
+      <div class="tag-list"><span class="tag t-ui">UI / UX</span><span class="tag t-db">State</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-medium">Medium</span>
+      <div>
+        <div class="finding-title">feedback.comments is NOT NULL in schema but server route has no validation</div>
+        <div class="finding-file">src/db/schema.ts (line 31) vs server.ts</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>A direct API call with an empty or missing <code>comments</code> field will cause a Postgres constraint violation and return a 500 error with a raw stack trace exposed to the client.</p>
+      <div class="tag-list"><span class="tag t-api">Validation</span><span class="tag t-db">Database</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-medium">Medium</span>
+      <div>
+        <div class="finding-title">WeatherPanel fallback rain probability can exceed 100%</div>
+        <div class="finding-file">src/components/WeatherPanel.tsx : lines 153–159</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>The formula <code>(estimatedHumidity - 40) * 1.2</code> has no <code>Math.min(100, ...)</code> clamp, meaning the UI can display "Rain Prob: 132%".</p>
+      <div class="tag-list"><span class="tag t-ui">Display Bug</span><span class="tag t-ui">WeatherPanel</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-medium">Medium</span>
+      <div>
+        <div class="finding-title">Drizzle schema uses serial() integer PKs while Supabase migration uses UUID PKs</div>
+        <div class="finding-file">src/db/schema.ts vs supabase/schema.sql + supabase/migrations/</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>The Drizzle schema uses auto-increment <code>serial</code> integer PKs. The Supabase SQL files use UUID PKs. These schemas are incompatible and there is no migration path defined for Drizzle.</p>
+      <div class="tag-list"><span class="tag t-db">Schema Mismatch</span><span class="tag t-db">Database</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-medium">Medium</span>
+      <div>
+        <div class="finding-title">handle_new_user_signup trigger is commented out — user profiles never auto-created</div>
+        <div class="finding-file">supabase/schema.sql : lines 167–170</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>The SQL trigger <code>trigger_on_auth_user_created</code> that inserts into <code>public.users</code> on signup is commented out. Without it, the <code>public.users</code> table will always be empty and all RLS policies will silently fail.</p>
+      <div class="tag-list"><span class="tag t-db">Supabase</span><span class="tag t-db">RLS</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-medium">Medium</span>
+      <div>
+        <div class="finding-title">React production SPA catch-all route conflicts with API routes</div>
+        <div class="finding-file">server.ts : lines 495–497</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p><code>app.get('*', ...)</code> will match any unregistered GET path, silently returning <code>index.html</code> instead of a 404 JSON error for mistyped or missing API routes.</p>
+      <div class="tag-list"><span class="tag t-api">Express</span><span class="tag t-api">Routing</span></div>
+    </div>
+  </div>
+
+
+  <!-- LOW -->
+  <h2>🔵 Low / Missing Features <span class="badge bg-blue">Incomplete Implementations</span></h2>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-low">Low</span>
+      <div>
+        <div class="finding-title">TextToSpeechController does not handle speech synthesis errors or unavailability</div>
+        <div class="finding-file">src/components/TextToSpeechController.tsx</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>No <code>onerror</code> handler on the utterance. If speech synthesis is unavailable, the button stays in "speaking" state permanently with no recovery.</p>
+      <div class="tag-list"><span class="tag t-ui">Accessibility</span><span class="tag t-ui">Error Handling</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-low">Low</span>
+      <div>
+        <div class="finding-title">README references "RESP-AI Defense Network" monitoring that does not exist</div>
+        <div class="finding-file">README.md + src/components/LoginPage.tsx : line 236</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>No such monitoring system is implemented anywhere in the codebase. Failed logins only write to a local React state log array.</p>
+      <div class="tag-list"><span class="tag t-sec">Misleading</span><span class="tag t-ui">UI Copy</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-low">Low</span>
+      <div>
+        <div class="finding-title">NearbyFacilitiesFinder error message is in mixed English/Spanish</div>
+        <div class="finding-file">src/components/NearbyFacilitiesFinder.tsx : line 124</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>Error string: <code>'OSM Live API unavailable, utilizando respaldo localizado.'</code> mixes English and Spanish in a single sentence.</p>
+      <div class="tag-list"><span class="tag t-ui">i18n</span><span class="tag t-ui">Copy</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-low">Low</span>
+      <div>
+        <div class="finding-title">getFallbackSeverityClass() is defined inside startServer() — cannot be unit tested</div>
+        <div class="finding-file">server.ts : line 367</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>Nested inside the async <code>startServer()</code> function. Should be at module scope alongside <code>getFallbackDisasterGuidance</code> for testability and consistency.</p>
+      <div class="tag-list"><span class="tag">Code Quality</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-low">Low</span>
+      <div>
+        <div class="finding-title">Socket.IO CORS is set to "*" (wildcard) with no auth on socket events</div>
+        <div class="finding-file">server.ts : lines 501–505</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>Any external client can emit <code>disaster_update</code> events that are broadcast to all connected coordinators, potentially injecting false emergency data into active incident dashboards.</p>
+      <div class="tag-list"><span class="tag t-sec">Security</span><span class="tag t-api">WebSocket</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-low">Low</span>
+      <div>
+        <div class="finding-title">EmergencyChecklist "active" SOS state is never reset after submission</div>
+        <div class="finding-file">src/components/EmergencyChecklist.tsx : handleActivateSOS()</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>Once <code>setActive(true)</code> is called there is no path to reset it. The button permanently reads "SOS ACTIVE - TRANSMITTING LOCATION" for the rest of the session.</p>
+      <div class="tag-list"><span class="tag t-ui">UI / UX</span><span class="tag t-ui">State</span></div>
+    </div>
+  </div>
+
+  <div class="finding">
+    <div class="finding-header">
+      <span class="sev sev-low">Low</span>
+      <div>
+        <div class="finding-title">package.json name is "react-example" — generic scaffold placeholder not updated</div>
+        <div class="finding-file">package.json : line 2</div>
+      </div>
+    </div>
+    <div class="finding-body">
+      <p>The package name is still the default scaffold name <code>"react-example"</code>, affecting npm scripts, Docker image naming, and CI/CD pipelines.</p>
+      <div class="tag-list"><span class="tag">Config</span></div>
+    </div>
+  </div>
+
+
+  <!-- MATRIX -->
+  <h2>📊 Component Readiness Matrix</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Component</th>
+        <th>State</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Frontend React UI (HUD, Map, Panels)</td><td><span class="dot-ok">✔ Functional</span></td><td>Renders correctly; cosmetic/UX issues only</td></tr>
+      <tr><td>Leaflet Map + OSM Facilities</td><td><span class="dot-ok">✔ Functional</span></td><td>Real OSM data + fallback; minor icon init timing risk</td></tr>
+      <tr><td>Weather Panel</td><td><span class="dot-ok">✔ Functional</span></td><td>Open-Meteo fallback works; rain% overflow bug</td></tr>
+      <tr><td>Disaster Preparedness Checklist</td><td><span class="dot-ok">✔ Functional</span></td><td>localStorage-backed, works offline</td></tr>
+      <tr><td>Email / Password Login</td><td><span class="dot-err">✘ Broken</span></td><td>Fake auth — any 6-char password grants admin</td></tr>
+      <tr><td>Google Firebase Login</td><td><span class="dot-warn">⚠ Partial</span></td><td>Real Firebase auth; role always hardcoded to coordinator</td></tr>
+      <tr><td>Simulated Access</td><td><span class="dot-warn">⚠ Demo only</span></td><td>Mock token breaks all protected API calls</td></tr>
+      <tr><td>Firebase Admin (server-side)</td><td><span class="dot-err">✘ Broken</span></td><td>No service account; verifyIdToken() will fail</td></tr>
+      <tr><td>Express API (logs, feedback, timeline)</td><td><span class="dot-warn">⚠ Partial</span></td><td>Routes exist; DB works if Postgres is provisioned with SSL fix</td></tr>
+      <tr><td>SOS Offline Queue</td><td><span class="dot-warn">⚠ Partial</span></td><td>Queue logic correct; sync fails with mock tokens</td></tr>
+      <tr><td>Gemini AI Chatbot (server.ts)</td><td><span class="dot-err">✘ Broken</span></td><td>Wrong model name; always uses static fallback</td></tr>
+      <tr><td>Python FastAPI Backend</td><td><span class="dot-warn">⚠ Stub only</span></td><td>All routes return mock data; Supabase never called</td></tr>
+      <tr><td>IBM watsonx Granite Integration</td><td><span class="dot-err">✘ Broken</span></td><td>IAM token is hardcoded "mock-iam-token"</td></tr>
+      <tr><td>Python JWT Verification</td><td><span class="dot-err">✘ Runtime crash</span></td><td>SUPABASE_JWT_SECRET missing from config</td></tr>
+      <tr><td>Supabase Schema / RLS</td><td><span class="dot-warn">⚠ Incomplete</span></td><td>User signup trigger commented out; conflicting schemas</td></tr>
+      <tr><td>Socket.IO Real-time Events</td><td><span class="dot-ok">✔ Functional</span></td><td>Works; no auth on socket events (CORS wildcard)</td></tr>
+      <tr><td>Incident Timeline</td><td><span class="dot-warn">⚠ Partial</span></td><td>Race condition in auto-seeding; works when auth is valid</td></tr>
+      <tr><td>TTS / Speech Controller</td><td><span class="dot-ok">✔ Functional</span></td><td>Missing onerror handler; otherwise works</td></tr>
+    </tbody>
+  </table>
+
+</div>
+
+<footer>
+  <p>Made with IBM Bob</p>
+</footer>
+</body>
+</html>
