@@ -34,6 +34,8 @@ export function EmergencyChecklist({
       onTriggerSOS(msg);
       setCustomMessage("");
     }
+    // FIX LOW #29: Reset active state after 8 seconds so operators can re-send SOS
+    setTimeout(() => setActive(false), 8000);
   };
 
   return (

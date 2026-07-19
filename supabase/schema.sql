@@ -164,10 +164,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger should fire on auth.users row insertion
--- CREATE TRIGGER trigger_on_auth_user_created
--- AFTER INSERT ON auth.users
--- FOR EACH ROW EXECUTE FUNCTION public.handle_new_user_signup();
+-- FIX MEDIUM #22: Uncommented the user signup trigger so new Supabase Auth users
+-- automatically get a profile row created in public.users (required for all RLS policies).
+CREATE TRIGGER trigger_on_auth_user_created
+AFTER INSERT ON auth.users
+FOR EACH ROW EXECUTE FUNCTION public.handle_new_user_signup();
 
 
 -- =====================================================================

@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.api import api_router
+from app.db.supabase import get_supabase_client
 
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
@@ -47,12 +48,34 @@ async def generate_response(request: GenerateResponseRequest):
     return advice
 
 @app.get("/", tags=["health"])
-def health_check():
+async def health_check():
+    """
+    FIX CRITICAL #6: Perform real connectivity checks instead of hardcoding True.
+    """
+    db_ok = False
+    llm_ok = False
+
+    # Check Supabase connectivity with a lightweight query
+    try:
+        client = get_supabase_client()
+        client.table("profiles").select("id").limit(1).execute()
+        db_ok = True
+    except Exception:
+        db_ok = False
+
+    # Check watsonx availability only if credentials are configured
+    llm_ok = (
+        settings.WATSONX_API_KEY != "placeholder_watsonx_key"
+        and settings.WATSONX_PROJECT_ID != "placeholder_project_id"
+    )
+
+    overall = "healthy" if (db_ok and llm_ok) else "degraded"
+
     return {
-        "status": "healthy",
+        "status": overall,
         "service": settings.PROJECT_NAME,
-        "database_connected": True,
-        "llm_connected": True
+        "database_connected": db_ok,
+        "llm_connected": llm_ok,
     }
 
 if __name__ == "__main__":

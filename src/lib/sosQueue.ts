@@ -244,9 +244,10 @@ export function useSOSQueue(idTokenFromSession: string | null, onLogAdded?: (msg
     };
 
     window.addEventListener("online", handleOnline);
-    
-    // Run an initial sync attempt if we are online and have items
-    if (navigator.onLine) {
+
+    // FIX HIGH #13: Only trigger initial sync if there are actually pending items,
+    // avoiding an unnecessary Firebase token fetch on every page load.
+    if (navigator.onLine && getPendingSOSQueue().length > 0) {
       syncQueue();
     }
 

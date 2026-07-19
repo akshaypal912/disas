@@ -55,9 +55,15 @@ export default function TacticalHistory({ onReopen, languageCode, idToken }: Tac
 
   // Load reports from localStorage and Database
   useEffect(() => {
+    // FIX MEDIUM #18: Respect the "cleared" flag so wiped history doesn't re-appear on mount
+    const wasCleared = localStorage.getItem("resp_ai_report_history_cleared") === "true";
+
     const saved = localStorage.getItem("resp_ai_report_history");
     let initialReports: HistoryReport[] = [];
-    if (saved) {
+    if (wasCleared) {
+      // User explicitly wiped — start with empty slate, no seeds
+      initialReports = [];
+    } else if (saved) {
       try {
         initialReports = JSON.parse(saved);
       } catch (e) {
@@ -89,7 +95,12 @@ export default function TacticalHistory({ onReopen, languageCode, idToken }: Tac
             aiResponse: log.message,
             severity: log.severity
           }));
-          setReports([...dbReports, ...initialReports.filter(r => !r.id.startsWith("db_"))]);
+          // Only include DB reports if the user hasn't explicitly wiped
+          if (!wasCleared) {
+            setReports([...dbReports, ...initialReports.filter(r => !r.id.startsWith("db_"))]);
+          } else {
+            setReports([]);
+          }
         } else {
           setReports(initialReports);
         }
@@ -121,7 +132,12 @@ export default function TacticalHistory({ onReopen, languageCode, idToken }: Tac
 
   const handleClearAll = () => {
     if (confirm("Are you sure you want to permanently wipe all tactical report logs?")) {
-      saveReports([]);
+      // FIX MEDIUM #18: Clear both localStorage AND the seeded/DB reports in state.
+      // DB-backed reports (id starting with "db_") reappear on refresh because they are
+      // re-fetched on mount. We suppress this by storing a "cleared" flag in localStorage.
+      localStorage.removeItem("resp_ai_report_history");
+      localStorage.setItem("resp_ai_report_history_cleared", "true");
+      setReports([]);
       showNotification("Report history wiped clean.");
       if (synthRef.current) {
         synthRef.current.cancel();
